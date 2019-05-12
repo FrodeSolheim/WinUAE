@@ -63,9 +63,11 @@ static void hwtrap_check_int(void)
 	if (currprefs.uaeboard < 2)
 		return;
 	if (hwtrap_waiting == 0) {
+		write_log(_T("atomic_and(&uae_int_requested, ~0x2000)\n"));
 		atomic_and(&uae_int_requested, ~0x2000);
 	} else {
 		atomic_or(&uae_int_requested, 0x2000);
+		write_log(_T("set_special_exter from hwtrap_check_int\n"));
 		set_special_exter(SPCFLAG_UAEINT);
 	}
 }
@@ -88,9 +90,11 @@ bool rethink_traps(void)
 		return false;
 	if (istrapwait()) {
 		atomic_or(&uae_int_requested, 0x4000);
+		write_log(_T("set_special_exter from rethink_traps\n"));
 		set_special_exter(SPCFLAG_UAEINT);
 		return true;
 	} else {
+		write_log(_T("atomic_and(&uae_int_requested, ~0x4000)\n"));
 		atomic_and(&uae_int_requested, ~0x4000);
 		return false;
 	}
@@ -187,7 +191,10 @@ static uae_u32 REGPARAM2 rtarea_bget (uaecptr addr)
 #endif
 		return v;
 	} else if (addr == RTAREA_INTREQ + 0) {
+		write_log(_T("uae_int_requested is %X\n"), uae_int_requested);
+		write_log(_T("atomic_bit_test_and_reset(&uae_int_requested, 0)\n"));
 		rtarea_bank.baseaddr[addr] = atomic_bit_test_and_reset(&uae_int_requested, 0);
+		write_log(_T("uae_int_requested is %X, rtarea_bank.baseaddr[addr] = %X\n"), uae_int_requested, rtarea_bank.baseaddr[addr]);
 		//write_log(rtarea_bank.baseaddr[addr] ? _T("+") : _T("-"));
 	} else if (addr == RTAREA_INTREQ + 1) {
 		rtarea_bank.baseaddr[addr] = hwtrap_waiting != 0;
@@ -487,7 +494,7 @@ uae_u32 boot_rom_copy(TrapContext *ctx, uaecptr rombase, int mode)
 	} else {
 		rtarea_write_enabled = false;
 		protect_roms(true);
-		write_log(_T("ROMBASE changed.\n"), absolute_rom_address);
+		write_log(_T("ROMBASE changed (%d)\n"), absolute_rom_address);
 		reloc = 1;
 	}
 	return reloc;
@@ -544,7 +551,7 @@ static uae_u32 REGPARAM2 getchipmemsize (TrapContext *ctx)
 static uae_u32 REGPARAM2 uae_puts (TrapContext *ctx)
 {
 	uae_char buf[MAX_DPATH];
-	trap_get_string(ctx, buf, trap_get_areg(ctx, 0), sizeof uae_char);
+	trap_get_string(ctx, buf, trap_get_areg(ctx, 0), sizeof(uae_char));
 	TCHAR *s = au(buf);
 	write_log(_T("%s"), s);
 	xfree(s);

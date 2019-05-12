@@ -52,6 +52,10 @@
 #include "sana2.h"
 #include "bsdsocket.h"
 #include "uaeresource.h"
+#ifdef WITH_SEGTRACKER
+#include "uae/debuginfo.h"
+#include "uae/segtracker.h"
+#endif
 #include "inputdevice.h"
 #include "clipboard.h"
 #include "consolehook.h"
@@ -71,7 +75,7 @@
 #endif
 
 #define TRACING_ENABLED 1
-int log_filesys = 0;
+int log_filesys = 3;
 
 #define TRAPMD 1
 
@@ -1039,6 +1043,8 @@ static void initialize_mountinfo (void)
 	nr = nr_units ();
 	cd_unit_offset = nr;
 	cd_unit_number = 0;
+
+#ifdef SCSIEMU
 	if (currprefs.scsi && currprefs.win32_automount_cddrives) {
 		uae_u32 mask = scsi_get_cd_drive_mask ();
 		for (int i = 0; i < 32; i++) {
@@ -1057,10 +1063,12 @@ static void initialize_mountinfo (void)
 			}
 		}
 	}
+#endif
 
 	for (nr = 0; nr < currprefs.mountitems; nr++) {
 		struct uaedev_config_data *uci = &currprefs.mountconfig[nr];
 		if (uci->ci.controller_type == HD_CONTROLLER_TYPE_UAE) {
+#ifdef SCSIEMU
 			if (uci->ci.type == UAEDEV_TAPE) {
 				struct uaedev_config_info ci;
 				memcpy (&ci, &uci->ci, sizeof (struct uaedev_config_info));
@@ -1070,6 +1078,7 @@ static void initialize_mountinfo (void)
 					allocuci (&currprefs, nr, idx, unitnum);
 				}
 			}
+#endif
 		}
 	}
 
@@ -3542,7 +3551,7 @@ static a_inode *find_aino(TrapContext* ctx, Unit *unit, uaecptr lock, const TCHA
 	return a;
 }
 
-static uaecptr make_lock(TrapContext *ctx, Unit *unit, uae_u32 uniq, long mode)
+static uaecptr make_lock(TrapContext *ctx, Unit *unit, uae_u32 uniq, uae_u32 mode)
 {
 	/* allocate lock from the list kept by the assembly code */
 	uaecptr lock;
@@ -7028,7 +7037,7 @@ static int filesys_iteration(UnitInfo *ui)
 		{ TRAPCMD_GET_LONG, { ui->self->locklist }, 2, 1 },
 		{ TRAPCMD_PUT_LONG },
 		{ TRAPCMD_PUT_LONG, { ui->self->locklist, morelocks }},
-		{ ui->self->volume ? TRAPCMD_GET_BYTE : TRAPCMD_NOP, { ui->self->volume + 64 }},
+		{ (uae_u16) (ui->self->volume ? TRAPCMD_GET_BYTE : TRAPCMD_NOP), { ui->self->volume + 64 }},
 	};
 	trap_multi(ctx, md, sizeof md / sizeof(struct trapmd));
 
@@ -7532,6 +7541,9 @@ static uae_u32 REGPARAM2 filesys_diagentry (TrapContext *ctx)
 		resaddr += 0x1A;
 	}
 
+#ifdef WITH_SEGTRACKER
+	resaddr = segtracker_startup(resaddr);
+#endif
 	resaddr = uaeres_startup(ctx, resaddr);
 #ifdef BSDSOCKET
 	resaddr = bsdlib_startup(ctx, resaddr);
@@ -8801,11 +8813,16 @@ static uae_u32 REGPARAM2 filesys_dev_storeinfo (TrapContext *ctx)
 		trap_put_long(ctx, parmpacket + 64, 1); /* Buffer mem type */
 		trap_put_long(ctx, parmpacket + 68, 0x7FFFFFFE); /* largest transfer */
 		trap_put_long(ctx, parmpacket + 72, 0xFFFFFFFE); /* dma mask */
+#ifdef SCSIEMU
 		trap_put_long(ctx, parmpacket + 76, scsi_get_cd_drive_media_mask () & (1 << cd_unit_no) ? -127 : -128); /* bootPri */
+#else
+		trap_put_long(ctx, parmpacket + 76, -128); /* bootPri */
+#endif
 		trap_put_long(ctx, parmpacket + 80, CDFS_DOSTYPE | (((cd_unit_no / 10) + '0') << 8) | ((cd_unit_no % 10) + '0'));
 		trap_put_long(ctx, parmpacket + 84, 0); /* baud */
 		trap_put_long(ctx, parmpacket + 88, 0); /* control */
 		trap_put_long(ctx, parmpacket + 92, 0); /* bootblocks */
+
 		return type;
 
 	} else {
@@ -8906,11 +8923,13 @@ static uae_u32 REGPARAM2 filesys_dev_storeinfo (TrapContext *ctx)
 static uae_u32 REGPARAM2 mousehack_done (TrapContext *ctx)
 {
 	int mode = trap_get_dreg(ctx, 1);
+	write_log(_T("mousehack_done mode: %d\n"), mode);
 	if (mode < 10) {
 		uaecptr diminfo = trap_get_areg(ctx, 2);
 		uaecptr dispinfo = trap_get_areg(ctx, 3);
 		uaecptr vp = trap_get_areg(ctx, 4);
 		return input_mousehack_status(ctx, mode, diminfo, dispinfo, vp, trap_get_dreg(ctx, 2));
+#ifdef WITH_CLIPBOARD
 	} else if (mode == 10) {
 		amiga_clipboard_die(ctx);
 	} else if (mode == 11) {
@@ -8923,6 +8942,7 @@ static uae_u32 REGPARAM2 mousehack_done (TrapContext *ctx)
 		amiga_clipboard_task_start(ctx, trap_get_dreg(ctx, 0));
 	} else if (mode == 15) {
 		amiga_clipboard_init(ctx);
+#endif
 	} else if (mode == 16) {
 		uaecptr a2 = trap_get_areg(ctx, 2);
 		input_mousehack_mouseoffset(a2);
@@ -9122,6 +9142,7 @@ void filesys_install (void)
 	uaecptr loop;
 
 	TRACEI ((_T("Installing filesystem\n")));
+	write_log(_T("here: %X\n"), here());
 
 	uae_sem_init (&singlethread_int_sem, 0, 1);
 	init_comm_pipe(&shellexecute_pipe, 100, 1);
@@ -9227,6 +9248,7 @@ void filesys_install_code (void)
 	bootrom_header = 3 * 4;
 	align(4);
 	bootrom_start = here ();
+	write_log(_T("bootrom_start: %X\n"), here());
 #include "filesys_bootrom.cpp"
 
 	items = dlg (bootrom_start + 8) & 0xffff;
@@ -9414,6 +9436,8 @@ static TCHAR *makenativepath (UnitInfo *ui, TCHAR *apath)
 	}
 	return pn;
 }
+
+#ifdef SAVESTATE
 
 static uae_u8 *restore_aino (UnitInfo *ui, Unit *u, uae_u8 *src)
 {
@@ -9876,8 +9900,8 @@ uae_u8 *save_filesys_paths(int num, int *len)
 	save_u32(0);
 	save_u32(ui->devno);
 	save_u16(type);
-	save_path_full(ui->rootdir, ptype);
-	save_path_full(ui->filesysdir, SAVESTATE_PATH);
+	save_path_full(_T("(rootdir)"), ptype);
+	save_path_full(_T("(filesysdir)"), SAVESTATE_PATH);
 
 	*len = dst - dstbak;
 	return dstbak;
@@ -10022,3 +10046,5 @@ int save_filesys_cando (void)
 		return -1;
 	return filesys_in_interrupt ? 0 : 1;
 }
+
+#endif /* SAVESTATE */

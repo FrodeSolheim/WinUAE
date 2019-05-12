@@ -33,17 +33,17 @@ static void premsg (void)
 	ast[5] = 0;
 	ws = au_fs (ast);
 
-	MessageBoxA(NULL, "español", "ANSI", MB_OK);
-	MessageBoxW(NULL, _T("español"), _T("UTF-16"), MB_OK);
+	MessageBoxA(NULL, "espaï¿½ol", "ANSI", MB_OK);
+	MessageBoxW(NULL, _T("espaï¿½ol"), _T("UTF-16"), MB_OK);
 
-	as = ua (_T("español"));
+	as = ua (_T("espaï¿½ol"));
 	MessageBoxA(NULL, as, "ANSI:2", MB_OK);
 	ws = au (as);
 	MessageBoxW(NULL, ws, _T("UTF-16:2"), MB_OK);
 	xfree (ws);
 	xfree (as);
 
-	ws = au ("español");
+	ws = au ("espaï¿½ol");
 	MessageBoxW(NULL, ws, _T("UTF-16:3"), MB_OK);
 	as = ua (ws);
 	MessageBoxA(NULL, as, "ANSI:3", MB_OK);
@@ -502,6 +502,10 @@ TCHAR *write_log_get_ts(void)
 	_tcsftime (curts, sizeof curts / sizeof (TCHAR), _T("%Y-%m-%d %H:%M:%S\n"), t);
 	p = out;
 	*p = 0;
+#if 1
+	_stprintf (p, _T("XX-XXX"));
+	p += _tcslen (p);
+#else
 	if (_tcsncmp (curts, lastts, _tcslen (curts) - 3)) { // "xx\n"
 		_tcscat (p, curts);
 		p += _tcslen (p);
@@ -511,6 +515,7 @@ TCHAR *write_log_get_ts(void)
 	p += _tcslen (p);
 	_stprintf (p, _T("%03d"), tb.millitm);
 	p += _tcslen (p);
+#endif
 	if (vsync_counter != 0xffffffff)
 		_stprintf (p, _T(" [%d %03d%s%03d]"), vsync_counter, current_hpos_safe (), lof_store ? _T("-") : _T("="), vpos);
 	_tcscat (p, _T(": "));

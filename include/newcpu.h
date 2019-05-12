@@ -82,6 +82,8 @@ struct comptbl {
 	uae_u32 opcode;
 	int specific;
 };
+#else
+#define MAX_JIT_CACHE 0
 #endif
 
 extern uae_u32 REGPARAM3 op_illg (uae_u32) REGPARAM;
@@ -302,19 +304,27 @@ extern int m68k_pc_indirect;
 
 extern void safe_interrupt_set(int, int, bool);
 
+extern unsigned long int hsync_counter, vsync_counter;
+
 STATIC_INLINE void set_special_exter(uae_u32 x)
 {
+	if (vsync_counter == 106) write_log(_T("spcflags was %08X set_special_exter %08X\n"), regs.spcflags, x);
 	atomic_or(&regs.spcflags, x);
+	if (vsync_counter == 106) write_log(_T("spcflags is  %08X\n"), regs.spcflags);
 }
 STATIC_INLINE void set_special (uae_u32 x)
 {
+	if (vsync_counter == 106) write_log(_T("spcflags was %08X set_special %08X\n"), regs.spcflags, x);
 	atomic_or(&regs.spcflags, x);
+	if (vsync_counter == 106) write_log(_T("spcflags is  %08X\n"), regs.spcflags);
 	cycles_do_special ();
 }
 
 STATIC_INLINE void unset_special (uae_u32 x)
 {
+	if (vsync_counter == 106) write_log(_T("spcflags was %08X unset_special %08X\n"), regs.spcflags, x);
 	atomic_and(&regs.spcflags, ~x);
+	if (vsync_counter == 106) write_log(_T("spcflags is  %08X\n"), regs.spcflags);
 }
 
 #define m68k_dreg(r,num) ((r).regs[(num)])
@@ -370,11 +380,20 @@ extern void branch_stack_pop_rts(uaecptr);
 
 STATIC_INLINE void m68k_setpc(uaecptr newpc)
 {
+	if (vsync_counter == 106) {
+		write_log("PC <- %08X (m68k_setpc)\n", newpc);
+		if (newpc == 0x00FC0CE2) {
+			write_log("bug??\n");
+		}
+	}
 	regs.pc_p = regs.pc_oldp = get_real_address(newpc);
 	regs.instruction_pc = regs.pc = newpc;
 }
 STATIC_INLINE void m68k_setpc_j(uaecptr newpc)
 {
+	if (vsync_counter == 106) {
+		write_log("PC <- %08X (m68k_setpc_j)\n", newpc);
+	}
 	regs.pc_p = regs.pc_oldp = get_real_address(newpc);
 	regs.pc = newpc;
 }
@@ -390,6 +409,9 @@ STATIC_INLINE uaecptr m68k_getpc_p(uae_u8 *p)
 STATIC_INLINE void m68k_incpc(int o)
 {
 	regs.pc_p += o;
+	if (vsync_counter == 106) {
+		// write_log("PC <- %08X (m68k_incpc)\n", regs.pc_p);
+	}	
 }
 
 STATIC_INLINE uae_u32 get_dibyte(int o)
@@ -434,10 +456,16 @@ STATIC_INLINE void m68k_do_rts(void)
 
 STATIC_INLINE void m68k_setpci(uaecptr newpc)
 {
+	if (vsync_counter == 106) {
+		write_log("PC <- %08X (m68k_setpci)\n", newpc);
+	}
 	regs.instruction_pc = regs.pc = newpc;
 }
 STATIC_INLINE void m68k_setpci_j(uaecptr newpc)
 {
+	if (vsync_counter == 106) {
+		write_log("PC <- %08X (m68k_setpci_j)\n", newpc);
+	}
 	regs.pc = newpc;
 }
 STATIC_INLINE uaecptr m68k_getpci(void)
@@ -447,6 +475,9 @@ STATIC_INLINE uaecptr m68k_getpci(void)
 STATIC_INLINE void m68k_incpci(int o)
 {
 	regs.pc += o;
+	if (vsync_counter == 106) {
+		write_log("PC <- %08X (m68k_incpci)\n", regs.pc);
+	}	
 }
 
 STATIC_INLINE uae_u32 get_iibyte(int o)

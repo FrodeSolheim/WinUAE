@@ -69,6 +69,9 @@
 #include "fsdb.h"
 
 int savestate_state = 0;
+
+#ifdef SAVESTATE
+
 static int savestate_first_capture;
 
 static bool new_blitter = false;
@@ -132,6 +135,8 @@ static void state_incompatible_warn (void)
 		notify_user (NUMSG_STATEHD);
 	}
 }
+
+#endif
 
 /* functions for reading/writing bytes, shorts and longs in big-endian
 * format independent of host machine's endianness */
@@ -206,10 +211,10 @@ void save_path_full_func(uae_u8 **dstp, const TCHAR *spath, int type)
 	TCHAR path[MAX_DPATH];
 	save_u32_func(dstp, type);
 	_tcscpy(path, spath ? spath : _T(""));
-	fullpath(path, MAX_DPATH, false);
+	// fullpath(path, MAX_DPATH, false);
 	save_string_func(dstp, path);
 	_tcscpy(path, spath ? spath : _T(""));
-	fullpath(path, MAX_DPATH, true);
+	// fullpath(path, MAX_DPATH, true);
 	save_string_func(dstp, path);
 }
 
@@ -265,6 +270,8 @@ TCHAR *restore_string_func (uae_u8 **dstp)
 	xfree (to);
 	return s;
 }
+
+#ifdef SAVESTATE
 
 static bool state_path_exists(const TCHAR *path, int type)
 {
@@ -429,7 +436,7 @@ static void save_chunk (struct zfile *f, uae_u8 *chunk, unsigned int len, const 
 	if (len2)
 		zfile_fwrite (zero, 1, len2, f);
 
-	write_log (_T("Chunk '%s' chunk size %u (%u)\n"), name, chunklen, len);
+	// write_log (_T("Chunk '%s' chunk size %u (%u)\n"), name, chunklen, len);
 }
 
 static uae_u8 *restore_chunk (struct zfile *f, TCHAR *name, unsigned int *len, unsigned int *totallen, size_t *filepos)
@@ -770,8 +777,10 @@ void restore_state (const TCHAR *filename)
 		else if (!_tcscmp (name, _T("SCS4")))
 			end = restore_scsi_device (WDTYPE_A2091_2, chunk);
 #endif
+#ifdef SCSIEMU
 		else if (!_tcscmp (name, _T("SCSD")))
 			end = restore_scsidev (chunk);
+#endif
 		else if (!_tcscmp (name, _T("GAYL")))
 			end = restore_gayle (chunk);
 		else if (!_tcscmp (name, _T("IDE ")))
@@ -830,7 +839,9 @@ void savestate_restore_finish (void)
 	restore_audio_finish ();
 	restore_disk_finish ();
 	restore_blitter_finish ();
+#ifdef CD32
 	restore_akiko_finish ();
+#endif
 #ifdef CDTV
 	restore_cdtv_finish ();
 #endif
@@ -906,6 +917,8 @@ static void save_rams (struct zfile *f, int comp)
 
 /* Save all subsystems */
 
+extern int cfg_fake;
+
 static int save_state_internal (struct zfile *f, const TCHAR *description, int comp, bool savepath)
 {
 	uae_u8 endhunk[] = { 'E', 'N', 'D', ' ', 0, 0, 0, 8 };
@@ -915,7 +928,7 @@ static int save_state_internal (struct zfile *f, const TCHAR *description, int c
 	TCHAR name[5];
 	int i, len;
 
-	write_log (_T("STATESAVE (%s):\n"), f ? zfile_getname (f) : _T("<internal>"));
+	// write_log (_T("STATESAVE (%s):\n"), f ? zfile_getname (f) : _T("<internal>"));
 	dst = header;
 	save_u32 (0);
 	save_string (_T("UAE"));
@@ -1090,11 +1103,13 @@ static int save_state_internal (struct zfile *f, const TCHAR *description, int c
 		}
 	}
 #endif
+#ifdef SCSIEMU
 	for (i = 0; i < MAX_TOTAL_SCSI_DEVICES; i++) {
 		dst = save_scsidev (i, &len, NULL);
 		save_chunk (f, dst, len, _T("SCSD"), 0);
 		xfree (dst);
 	}
+#endif
 #ifdef ACTION_REPLAY
 	dst = save_action_replay (&len, NULL);
 	save_chunk (f, dst, len, _T("ACTR"), comp);
@@ -1155,21 +1170,28 @@ static int save_state_internal (struct zfile *f, const TCHAR *description, int c
 	/* add fake END tag, makes it easy to strip CONF and LOG hunks */
 	/* move this if you want to use CONF or LOG hunks when restoring state */
 	zfile_fwrite (endhunk, 1, 8, f);
-
+#if 1
+	cfg_fake = 1;
 	dst = save_configuration (&len, false);
+	cfg_fake = 0;
 	if (dst) {
-		save_chunk (f, dst, len, _T("CONF"), comp);
+#if 1
+		save_chunk (f, dst + 154, len - 154, _T("CONF"), comp);
+#else
+	save_chunk (f, dst, len, _T("CONF"), comp);
+#endif
 		xfree(dst);
 	}
+#if 0
 	len = 30000;
 	dst = save_log (TRUE, &len);
 	if (dst) {
 		save_chunk (f, dst, len, _T("LOG "), comp);
 		xfree (dst);
 	}
-
+#endif
 	zfile_fwrite (endhunk, 1, 8, f);
-
+#endif
 	return 1;
 }
 
@@ -1177,6 +1199,7 @@ int save_state (const TCHAR *filename, const TCHAR *description)
 {
 	struct zfile *f;
 	int comp = savestate_docompress;
+	comp = 0;
 
 	if (!savestate_specialdump && !savestate_nodialogs) {
 		state_incompatible_warn ();
@@ -1214,8 +1237,8 @@ int save_state (const TCHAR *filename, const TCHAR *description)
 		return 1;
 	}
 	int v = save_state_internal (f, description, comp, true);
-	if (v)
-		write_log (_T("Save of '%s' complete\n"), filename);
+	//if (v)
+	//	write_log (_T("Save of '%s' complete\n"), filename);
 	zfile_fclose (f);
 	DISK_history_add(filename, -1, HISTORY_STATEFILE, 0);
 	savestate_state = 0;
@@ -2196,3 +2219,5 @@ misc:
 - should we strip all paths from image file names?
 
 */
+
+#endif /* SAVESTATE */

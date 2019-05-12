@@ -84,6 +84,7 @@ uaecptr uaeres_startup (TrapContext *ctx, uaecptr resaddr)
 
 void uaeres_install (void)
 {
+	write_log(_T("uaeres_install\n"));
 	uae_u32 functable, datatable;
 	uae_u32 initcode, getfunc;
 	TCHAR tmp[100];
@@ -94,6 +95,7 @@ void uaeres_install (void)
 
 	/* initcode */
 	initcode = here ();
+	write_log(_T("initcode = %X\n"), here());
 	calltrap (deftrap (res_initcode)); dw (RTS);
 	/* getfunc */
 	getfunc = here ();
@@ -101,11 +103,13 @@ void uaeres_install (void)
 
 	/* FuncTable */
 	functable = here ();
+	write_log(_T("functable = %X\n"), here());
 	dl (getfunc); /* getfunc */
 	dl (0xFFFFFFFF); /* end of table */
 
 	/* DataTable */
 	datatable = here ();
+	write_log(_T("datatable = %X\n"), here());
 	dw (0xE000); /* INITBYTE */
 	dw (0x0008); /* LN_TYPE */
 	dw (0x0800); /* NT_RESOURCE */
@@ -131,4 +135,5 @@ void uaeres_install (void)
 	dl (functable);
 	dl (datatable);
 	dl (initcode);
+	write_log(_T("initcode done @ %X\n"), here());
 }

@@ -1713,6 +1713,8 @@ STATIC_INLINE void do_delays_fast_3_ecs (int nbits)
 		do_tosrc (0, 1, nbits2, 0);
 }
 
+#ifdef AGA
+
 STATIC_INLINE void do_delays_3_aga (int nbits, int fm)
 {
 	int delaypos = delay_cycles & fetchmode_mask;
@@ -1758,6 +1760,8 @@ STATIC_INLINE void do_delays_fast_3_aga (int nbits, int fm)
 		do_tosrc(0, 1, nbits2, fm);
 	}
 }
+
+#endif
 
 #if 0
 
@@ -2556,7 +2560,7 @@ STATIC_INLINE void long_fetch_64 (int plane, int nwords, int weird_number_of_bit
 		return;
 
 #ifdef HAVE_UAE_U128
-	shiftbuffer = todisplay2_aga[plane] << delay;
+	shiftbuffer = ((uae_u128) todisplay2_aga[plane]) << delay;
 #else
 	shiftbuffer[1] = 0;
 	shiftbuffer[0] = todisplay2_aga[plane];
@@ -4523,6 +4527,7 @@ void compute_vsynctime (void)
 			}
 		}
 	}
+	vblank_hz = 49.920399;
 	if (!fake_vblank_hz)
 		fake_vblank_hz = vblank_hz;
 
@@ -5711,6 +5716,12 @@ void rethink_uae_int(void)
 	bool irq2 = false;
 	bool irq6 = false;
 
+	if (vsync_counter == 106) {
+		if (uae_int_requested) {
+			write_log(_T("uae_int_requested %X\n"), uae_int_requested);
+		}
+	}
+
 	if (uae_int_requested) {
 		if (uae_int_requested & 0xff00)
 			irq6 = true;
@@ -6185,6 +6196,7 @@ static void BPLxDAT (int hpos, int num, uae_u16 v)
 	}
 	flush_display (fetchmode);
 	fetched[num] = v;
+#ifdef AGA
 	if ((fmode & 3) == 3) {
 		fetched_aga[num] = ((uae_u64)last_custom_value2 << 48) | ((uae_u64)v << 32) | (v << 16) | v;
 	} else if ((fmode & 3) == 2) {
@@ -6194,6 +6206,7 @@ static void BPLxDAT (int hpos, int num, uae_u16 v)
 	} else {
 		fetched_aga[num] = v;
 	}
+#endif
 	if (num == 0 && hpos >= 8) {
 		bpl1dat_written = true;
 		bpl1dat_written_at_least_once = true;
@@ -7510,11 +7523,14 @@ static void cursorsprite (void)
 	sprite_0_doubled = 0;
 	if (sprres == 0)
 		sprite_0_doubled = 1;
-	if (currprefs.chipset_mask & CSMASK_AGA) {
+	if (0) {
+#ifdef AGA
+	} else if (currprefs.chipset_mask & CSMASK_AGA) {
 		int sbasecol = ((bplcon4 >> 4) & 15) << 4;
 		sprite_0_colors[1] = current_colors.color_regs_aga[sbasecol + 1];
 		sprite_0_colors[2] = current_colors.color_regs_aga[sbasecol + 2];
 		sprite_0_colors[3] = current_colors.color_regs_aga[sbasecol + 3];
+#endif
 	} else {
 		sprite_0_colors[1] = xcolors[current_colors.color_regs_ecs[17]];
 		sprite_0_colors[2] = xcolors[current_colors.color_regs_ecs[18]];
@@ -8307,9 +8323,74 @@ static void vsync_handler_pre (void)
 	//checklacecount (bplcon0_interlace_seen || lof_lace);
 }
 
+static uint32_t get_memory_checksum(void *data, int size)
+{
+	uint32_t checksum = 0;
+	int bank_size;
+    uint32_t *mem;
+    int pos = 0;
+
+    mem = (uint32_t *) chipmem_bank.baseaddr;
+    bank_size = chipmem_bank.allocated_size / 4;
+    if (data) {
+        if (pos + bank_size * 4 <= size) {
+            memcpy((char *) data + pos, mem, bank_size * 4);
+        }
+        pos += bank_size * 4;
+    }
+    for (int i = 0; i < bank_size; i++) {
+        //checksum = (checksum + *mem) & 0x00ffffff;
+    	checksum += *mem;
+        mem++;
+    }
+
+    mem = (uint32_t *) bogomem_bank.baseaddr;
+    bank_size = bogomem_bank.allocated_size / 4;
+    if (data) {
+        if (pos + bank_size * 4 <= size) {
+            memcpy((char *) data + pos, mem, bank_size * 4);
+        }
+        pos += bank_size * 4;
+    }
+    for (int i = 0; i < bank_size; i++) {
+    	checksum += *mem;
+        mem++;
+    }
+
+    mem = (uint32_t *) fastmem_bank[0].baseaddr;
+    bank_size = fastmem_bank[0].allocated_size / 4;
+    if (data) {
+        if (pos + bank_size * 4 <= size) {
+            memcpy((char *) data + pos, mem, bank_size * 4);
+        }
+        pos += bank_size * 4;
+    }
+    for (int i = 0; i < bank_size; i++) {
+        checksum += *mem;
+        mem++;
+    }
+
+    return checksum;
+}
+
 // emulated hardware vsync
 static void vsync_handler_post (void)
 {
+	uint32_t checksum = get_memory_checksum(NULL, 0);
+	write_log(_T("vsync_handler_post memory checksum %08X\n"), checksum);
+	if (vsync_counter <= 107) {
+		TCHAR path[1000];
+		path[0] = _T('\0');
+		_stprintf(path, _T("D:\\amiga\\%03d-winuae.uss"), vsync_counter);
+		
+		save_state(path, _T(""));
+	}
+	if (vsync_counter == 106) {
+		//set_cpu_tracer(true);
+	}
+	if (vsync_counter == 107) {
+		//set_cpu_tracer(false);
+	}
 	int monid = 0;
 	static frame_time_t prevtime;
 
@@ -9846,10 +9927,12 @@ static void hsync_handler (void)
 	if (vs) {
 		vsyncmintimepre = read_processor_time();
 		vsync_handler_pre ();
+#ifdef SAVESTATE
 		if (savestate_check ()) {
 			uae_reset (0, 0);
 			return;
 		}
+#endif
 	}
 	hsync_handler_post (vs);
 }
@@ -10978,7 +11061,9 @@ uae_u8 *save_custom (int *len, uae_u8 *dstptr, int full)
 		}
 	}
 	for (i = 0; i < 32; i++) {
-		if (currprefs.chipset_mask & CSMASK_AGA) {
+		if (0) {
+#ifdef AGA
+		} else if (currprefs.chipset_mask & CSMASK_AGA) {
 			uae_u32 v = current_colors.color_regs_aga[i];
 			uae_u16 v2;
 			v &= 0x00f0f0f0;
@@ -10986,6 +11071,7 @@ uae_u8 *save_custom (int *len, uae_u8 *dstptr, int full)
 			v2 |= ((v >> 12) & 15) << 4;
 			v2 |= ((v >> 20) & 15) << 8;
 			SW (v2);
+#endif
 		} else {
 			uae_u16 v = current_colors.color_regs_ecs[i];
 			if (color_regs_genlock[i])

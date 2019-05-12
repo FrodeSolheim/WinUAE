@@ -3018,6 +3018,7 @@ static int iack_cycle(int nr)
 
 static void Exception_ce000 (int nr)
 {
+	if (vsync_counter == 106) write_log(_T("Exception_ce000 %d\n"), nr);
 	uae_u32 currpc = m68k_getpc (), newpc;
 	int sv = regs.s;
 	int start, interrupt;
@@ -3812,6 +3813,7 @@ void REGPARAM2 Exception_cpu(int nr)
 }
 void REGPARAM2 Exception (int nr)
 {
+	if (vsync_counter == 106) write_log(_T("Exception %d\n"), nr);
 	ExceptionX (nr, -1);
 }
 void REGPARAM2 ExceptionL (int nr, uaecptr address)
@@ -3830,6 +3832,7 @@ static void bus_error(void)
 
 static void do_interrupt (int nr)
 {
+	if (vsync_counter == 106) write_log(_T("do_interrupt %d\n"), nr);
 	if (debug_dma)
 		record_dma_event (DMA_EVENT_CPUIRQ, current_hpos (), vpos);
 
@@ -4560,7 +4563,12 @@ static void check_uae_int_request(void)
 
 void safe_interrupt_set(int num, int id, bool i6)
 {
+	if (vsync_counter == 106) write_log(_T("safe_interrupt_set num %d id %d i6 %d\n"), num, id, i6);
+	if (num == 7) {
+		write_log(_T("num 7?\n"));
+	}
 	if (!is_mainthread()) {
+		if (vsync_counter == 106) write_log(_T("set_special_exter from safe_interrupt_set\n"));
 		set_special_exter(SPCFLAG_UAEINT);
 		volatile uae_atomic *p;
 		if (i6)
@@ -4572,6 +4580,7 @@ void safe_interrupt_set(int num, int id, bool i6)
 	} else {
 		uae_u16 v = i6 ? 0x2000 : 0x0008;
 		if (currprefs.cpu_cycle_exact || (!(intreq & v) && !currprefs.cpu_cycle_exact)) {
+			if (vsync_counter == 106) write_log(_T("INTREQ_0(%X);\n"), 0x8000 | v);
 			INTREQ_0(0x8000 | v);
 		}
 	}
@@ -5234,6 +5243,16 @@ static void m68k_run_1_ce (void)
 				}
 
 				r->instruction_pc = m68k_getpc ();
+				if (vsync_counter == 106) {
+					write_log("PC=%08X OP=%08X D0=%08X D1=%08X D2=%08X D3=%08X D4=%08X D5=%08X D6=%08X D7=%08X A0=%08X A1=%08X A2=%08X A3=%08X A4=%08X A5=%08X A6=%08X XX=%08X \n",
+						r->instruction_pc, r->opcode,
+						r->regs[0], r->regs[1], r->regs[2], r->regs[3],
+						r->regs[4], r->regs[5], r->regs[6], r->regs[7],
+						r->regs[8], r->regs[9], r->regs[10], r->regs[11],
+						r->regs[12], r->regs[13], r->regs[14], r->regs[15]
+					);
+					write_log("IPL=%08X MASK=%08X\n", regs.ipl, regs.intmask);
+				}
 				(*cpufunctbl[r->opcode])(r->opcode);
 				wait_memory_cycles();
 				if (cpu_tracer) {

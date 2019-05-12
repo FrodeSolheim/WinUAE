@@ -374,6 +374,7 @@ int getcapslock (void)
 	capstable[5] = host_scrolllockstate;
 	capstable[6] = 0;
 	capslockstate = inputdevice_synccapslock (capslockstate, capstable);
+	write_log(_T("capslockstate = %d\n"), capslockstate);
 	return capslockstate;
 }
 

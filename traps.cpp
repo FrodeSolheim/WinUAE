@@ -13,7 +13,7 @@
 #include "sysconfig.h"
 #include "sysdeps.h"
 
-#define NEW_TRAP_DEBUG 0
+#define NEW_TRAP_DEBUG 1
 
 #include "options.h"
 #include "memory.h"
@@ -81,7 +81,7 @@ static unsigned int trap_count = 1;
 
 volatile uae_atomic hwtrap_waiting;
 
-static const int trace_traps = 0;
+static const int trace_traps = 1;
 
 static void trap_HandleExtendedTrap (TrapHandler, int has_retval);
 
@@ -109,6 +109,7 @@ uaecptr find_trap (const TCHAR *name)
 */
 unsigned int define_trap (TrapHandler handler_func, int flags, const TCHAR *name)
 {
+	write_log(_T("define_trap flags %d: %s\n"), flags, name);
 	if (trap_count == MAX_TRAPS) {
 		write_log (_T("Ran out of emulator traps\n"));
 		abort ();
@@ -153,6 +154,9 @@ void REGPARAM2 m68k_handle_trap (unsigned int trap_num)
 
 	if (trap->name && trap->name[0] != 0 && trace_traps)
 		write_log (_T("TRAP: %s\n"), trap->name);
+	else {
+		write_log (_T("TRAP: %d\n"), trap_num);
+	}
 
 	if (trap_num < trap_count) {
 		if (trap->flags & TRAPFLAG_EXTRA_STACK) {
@@ -165,6 +169,7 @@ void REGPARAM2 m68k_handle_trap (unsigned int trap_num)
 		} else {
 			/* Handle simple trap */
 			retval = (trap->handler) (NULL);
+			write_log(_T("retval %X\n"), retval);
 
 			if (has_retval)
 				m68k_dreg (regs, 0) = retval;
@@ -242,12 +247,14 @@ static void copytocpucontext(struct TrapCPUContext *cpu)
 	memcpy (cpu->regs, regs.regs, sizeof (regs.regs));
 	cpu->intmask = regs.intmask;
 	cpu->pc = m68k_getpc ();
+	write_log(_T("%X <- m68k_getpc\n"), cpu->pc);
 }
 static void copyfromcpucontext(struct TrapCPUContext *cpu, uae_u32 pc)
 {
 	memcpy (regs.regs, cpu->regs, sizeof (regs.regs));
 	regs.intmask = cpu->intmask;
 	m68k_setpc (pc);
+	write_log(_T("m68k_setpc %X\n"), pc);
 }
 
 
@@ -312,6 +319,7 @@ static void *trap_thread (void *arg)
 */
 static void trap_HandleExtendedTrap(TrapHandler handler_func, int has_retval)
 {
+	write_log(_T("trap_HandleExtendedTrap\n"));
 	struct TrapContext *context = xcalloc(TrapContext, 1);
 
 	if (context) {
@@ -350,6 +358,7 @@ static uae_u32 call_hardware_trap_back(TrapContext *ctx, uae_u16 cmd, uae_u32 p1
 
 static uae_u32 trap_Call68k(TrapContext *ctx, uaecptr func_addr)
 {
+	write_log(_T("trap_Call68k\n"));
 	if (ctx->host_trap_data) {
 
 		return call_hardware_trap_back(ctx, 10, func_addr, 0, 0, 0);
@@ -392,6 +401,7 @@ static uae_u32 trap_Call68k(TrapContext *ctx, uaecptr func_addr)
 */
 static uae_u32 REGPARAM2 m68k_call_handler(TrapContext *dummy_ctx)
 {
+	write_log(_T("m68k_call_handler\n"));
 	TrapContext *context = current_context;
 
 	uae_u32 sp;
@@ -430,6 +440,7 @@ static uae_u32 REGPARAM2 m68k_call_handler(TrapContext *dummy_ctx)
 */
 static uae_u32 REGPARAM2 m68k_return_handler(TrapContext *dummy_ctx)
 {
+	write_log(_T("m68k_return_handler\n"));
 	TrapContext *context;
 	uae_u32 sp;
 
@@ -464,6 +475,7 @@ static uae_u32 REGPARAM2 m68k_return_handler(TrapContext *dummy_ctx)
 */
 static uae_u32 REGPARAM2 exit_trap_handler(TrapContext *dummy_ctx)
 {
+	write_log(_T("exit_trap_handler\n"));
 	TrapContext *context = current_context;
 
 	/* Wait for trap context thread to exit. */
@@ -497,6 +509,7 @@ static uae_u32 REGPARAM2 exit_trap_handler(TrapContext *dummy_ctx)
 */
 uae_u32 CallLib(TrapContext *ctx, uaecptr base, uae_s16 offset)
 {
+	write_log(_T("CallLib\n"));
 	uae_u32 retval;
 	uaecptr olda6 = trap_get_areg(ctx, 6);
 
@@ -544,24 +557,25 @@ static void hardware_trap_ack(TrapContext *ctx)
 	put_byte_host(status + 2, 0xff);
 	if (task && trap_mode == 1) {
 		atomic_or(&uae_int_requested, 0x4000);
+		write_log(_T("set_special_exter from hardware_trap_ack\n"));
 		set_special_exter(SPCFLAG_UAEINT);
 	}
 	if (!trap_in_use[ctx->trap_slot])
-		write_log(_T("TRAP SLOT %d ACK WIIHOUT ALLOCATION!\n"));
+		write_log(_T("TRAP SLOT %d ACK WIIHOUT ALLOCATION!\n"), ctx->trap_slot);
 	trap_in_use[ctx->trap_slot] = false;
 	xfree(ctx);
 }
 
 static void *hardware_trap_thread(void *arg)
 {
-	int tid = (uae_u32)arg;
+	int tid = (uae_u32)(uintptr_t)arg;
 	for (;;) {
 		TrapContext *ctx = (TrapContext*)read_comm_pipe_pvoid_blocking(&trap_thread_pipe[tid]);
 		if (!ctx)
 			break;
 
 		if (trap_in_use[ctx->trap_slot]) {
-			write_log(_T("TRAP SLOT %d ALREADY IN USE!\n"));
+			write_log(_T("TRAP SLOT %d ALREADY IN USE!\n"), ctx->trap_slot);
 		}
 		trap_in_use[ctx->trap_slot] = true;
 
@@ -576,6 +590,7 @@ static void *hardware_trap_thread(void *arg)
 		}
 		put_long_host(status + RTAREA_TRAP_STATUS_SECOND, 0);
 
+		int trap_num = get_word_host(status);
 #if NEW_TRAP_DEBUG
 		//if (_tcscmp(trap->name, _T("exter_int_helper")))
 			write_log(_T("TRAP SLOT %d: NUM %d\n"), ctx->trap_slot, trap_num);
@@ -590,7 +605,6 @@ static void *hardware_trap_thread(void *arg)
 		if (ctx->callback) {
 			ret = ctx->callback(ctx, ctx->callback_ud);
 		} else {
-			int trap_num = get_word_host(status);
 			trap = &traps[trap_num];
 			ret = trap->handler(ctx);
 		}
@@ -638,6 +652,7 @@ void trap_dos_active(void)
 
 void call_hardware_trap(uae_u8 *host_base, uaecptr amiga_base, int slot)
 {
+	write_log(_T("call_hardware_trap\n"));
 	TrapContext *ctx = xcalloc(TrapContext, 1);
 	ctx->host_trap_data = host_base + RTAREA_TRAP_DATA + slot * RTAREA_TRAP_DATA_SLOT_SIZE;
 	ctx->amiga_trap_data = amiga_base + RTAREA_TRAP_DATA + slot * RTAREA_TRAP_DATA_SLOT_SIZE;
@@ -714,6 +729,7 @@ static uae_u32 call_hardware_trap_back(TrapContext *ctx, uae_u16 cmd, uae_u32 p1
 	} else {
 		atomic_inc(&hwtrap_waiting);
 		atomic_or(&uae_int_requested, 0x2000);
+		write_log(_T("set_special_exter from call_hardware_trap_back\n"));
 		set_special_exter(SPCFLAG_UAEINT);
 		*d = 0xff;
 	}
@@ -753,6 +769,7 @@ static uae_u32 call_hardware_trap_back(TrapContext *ctx, uae_u16 cmd, uae_u32 p1
 // Executes trap from C-code
 void trap_callback(TRAP_CALLBACK cb, void *ud)
 {
+	write_log(_T("trap_callback\n"));
 	if (trap_is_indirect()) {
 		int trap_slot = RTAREA_TRAP_DATA_NUM;
 		TrapContext *ctx = xcalloc(TrapContext, 1);
@@ -800,18 +817,20 @@ TrapContext *alloc_host_thread_trap_context(void)
 */
 void init_traps(void)
 {
+	write_log(_T("init_traps\n"));
 	trap_count = 0;
 	if (!trap_thread_id[0] && trap_is_indirect()) {
 		for (int i = 0; i < TRAP_THREADS; i++) {
 			init_comm_pipe(&trap_thread_pipe[i], 100, 1);
 			hardware_trap_kill[i] = 1;
-			uae_start_thread_fast(hardware_trap_thread, (void *)i, &trap_thread_id[i]);
+			uae_start_thread_fast(hardware_trap_thread, (void *)(uintptr_t) i, &trap_thread_id[i]);
 		}
 	}
 }
 
 void free_traps(void)
 {
+	write_log(_T("free_traps\n"));
 	for (int i = 0; i < TRAP_THREADS; i++) {
 		if (trap_thread_id[i]) {
 			if (hardware_trap_kill[i] >= 0) {
@@ -833,6 +852,7 @@ void free_traps(void)
 */
 void init_extended_traps (void)
 {
+	write_log(_T("init_extended_traps\n"));
 	m68k_call_trapaddr = here ();
 	calltrap (deftrap2 (m68k_call_handler, TRAPFLAG_NO_RETVAL, _T("m68k_call")));
 
@@ -874,6 +894,7 @@ void trap_call_add_areg(TrapContext *ctx, int reg, uae_u32 v)
 }
 uae_u32 trap_call_lib(TrapContext *ctx, uaecptr base, uae_s16 offset)
 {
+	write_log(_T("trap_call_lib\n"));
 	uae_u32 v;
 	if (trap_is_indirect_null(ctx)) {
 		uae_u8 *p = ctx->host_trap_data + RTAREA_TRAP_DATA_EXTRA;
@@ -912,6 +933,7 @@ uae_u32 trap_call_lib(TrapContext *ctx, uaecptr base, uae_s16 offset)
 }
 uae_u32 trap_call_func(TrapContext *ctx, uaecptr func)
 {
+	write_log(_T("trap_call_func\n"));
 	uae_u32 v;
 	if (trap_is_indirect_null(ctx)) {
 		uae_u8 *p = ctx->host_trap_data + RTAREA_TRAP_DATA_EXTRA;
@@ -993,6 +1015,7 @@ uae_u32 trap_get_areg(TrapContext *ctx, int reg)
 }
 void trap_set_dreg(TrapContext *ctx, int reg, uae_u32 v)
 {
+	write_log(_T("trap_set_dreg %d %X\n"), reg, v);
 	if (trap_is_indirect_null(ctx)) {
 		if (!ctx) {
 			write_log(_T("trap_set_dreg() without TrapContext!\n"));
@@ -1005,6 +1028,7 @@ void trap_set_dreg(TrapContext *ctx, int reg, uae_u32 v)
 }
 void trap_set_areg(TrapContext *ctx, int reg, uae_u32 v)
 {
+	write_log(_T("trap_set_areg %d %X\n"), reg, v);
 	if (trap_is_indirect_null(ctx)) {
 		if (!ctx) {
 			write_log(_T("trap_set_areg() without TrapContext!\n"));
@@ -1024,6 +1048,7 @@ void trap_put_quad(TrapContext *ctx, uaecptr addr, uae_u64 v)
 }
 void trap_put_long(TrapContext *ctx, uaecptr addr, uae_u32 v)
 {
+	write_log(_T("trap_put_long %X %X\n"), addr, v);
 	if (trap_is_indirect_null(ctx)) {
 		call_hardware_trap_back(ctx, TRAPCMD_PUT_LONG, addr, v, 0, 0);
 	} else {
@@ -1032,6 +1057,7 @@ void trap_put_long(TrapContext *ctx, uaecptr addr, uae_u32 v)
 }
 void trap_put_word(TrapContext *ctx, uaecptr addr, uae_u16 v)
 {
+	write_log(_T("trap_put_word %X %X\n"), addr, v);
 	if (trap_is_indirect_null(ctx)) {
 		call_hardware_trap_back(ctx, TRAPCMD_PUT_WORD, addr, v, 0, 0);
 	} else  {
@@ -1040,6 +1066,7 @@ void trap_put_word(TrapContext *ctx, uaecptr addr, uae_u16 v)
 }
 void trap_put_byte(TrapContext *ctx, uaecptr addr, uae_u8 v)
 {
+	write_log(_T("trap_put_byte %X %X\n"), addr, v);
 	if (trap_is_indirect_null(ctx)) {
 		call_hardware_trap_back(ctx, TRAPCMD_PUT_BYTE, addr, v, 0, 0);
 	} else {
@@ -1080,6 +1107,7 @@ uae_u8 trap_get_byte(TrapContext *ctx, uaecptr addr)
 
 void trap_put_bytes(TrapContext *ctx, const void *haddrp, uaecptr addr, int cnt)
 {
+	write_log(_T("trap_put_bytes %X cnt %d\n"), addr, cnt);
 	if (cnt <= 0)
 		return;
 	uae_u8 *haddr = (uae_u8*)haddrp;
@@ -1130,6 +1158,7 @@ void trap_get_bytes(TrapContext *ctx, void *haddrp, uaecptr addr, int cnt)
 }
 void trap_put_longs(TrapContext *ctx, uae_u32 *haddr, uaecptr addr, int cnt)
 {
+	write_log(_T("trap_put_longs %X cnt %d\n"), addr, cnt);
 	if (cnt <= 0)
 		return;
 	if (trap_is_indirect_null(ctx)) {
@@ -1174,6 +1203,7 @@ void trap_get_longs(TrapContext *ctx, uae_u32 *haddr, uaecptr addr, int cnt)
 }
 void trap_put_words(TrapContext *ctx, uae_u16 *haddr, uaecptr addr, int cnt)
 {
+	write_log(_T("trap_put_words %X cnt %d\n"), addr, cnt);
 	if (cnt <= 0)
 		return;
 	if (trap_is_indirect_null(ctx)) {
@@ -1219,6 +1249,7 @@ void trap_get_words(TrapContext *ctx, uae_u16 *haddr, uaecptr addr, int cnt)
 
 int trap_put_string(TrapContext *ctx, const void *haddrp, uaecptr addr, int maxlen)
 {
+	write_log(_T("trap_put_strings %X\n"), addr);
 	int len = 0;
 	uae_u8 *haddr = (uae_u8*)haddrp;
 	if (trap_is_indirect_null(ctx)) {
@@ -1276,7 +1307,7 @@ uae_char *trap_get_alloc_string(TrapContext *ctx, uaecptr addr, int maxlen)
 	return buf;
 }
 
-int trap_get_bstr(TrapContext *ctx, uae_u8 *haddr, uaecptr addr, int maxlen)
+static int trap_get_bstr(TrapContext *ctx, uae_u8 *haddr, uaecptr addr, int maxlen)
 {
 	int len = 0;
 	if (trap_is_indirect_null(ctx)) {
@@ -1302,6 +1333,7 @@ int trap_get_bstr(TrapContext *ctx, uae_u8 *haddr, uaecptr addr, int maxlen)
 
 void trap_set_longs(TrapContext *ctx, uaecptr addr, uae_u32 v, int cnt)
 {
+	write_log(_T("trap_set_longs %X (%d) = %X\n"), addr, cnt, v);
 	if (cnt <= 0)
 		return;
 	if (trap_is_indirect_null(ctx)) {
@@ -1315,6 +1347,7 @@ void trap_set_longs(TrapContext *ctx, uaecptr addr, uae_u32 v, int cnt)
 }
 void trap_set_words(TrapContext *ctx, uaecptr addr, uae_u16 v, int cnt)
 {
+	write_log(_T("trap_set_words %X (%d) = %X\n"), addr, cnt, v);
 	if (cnt <= 0)
 		return;
 	if (trap_is_indirect_null(ctx)) {
@@ -1328,6 +1361,7 @@ void trap_set_words(TrapContext *ctx, uaecptr addr, uae_u16 v, int cnt)
 }
 void trap_set_bytes(TrapContext *ctx, uaecptr addr, uae_u8 v, int cnt)
 {
+	write_log(_T("trap_set_bytes %X (%d) = %X\n"), addr, cnt, v);
 	if (cnt <= 0)
 		return;
 	if (trap_is_indirect_null(ctx)) {
@@ -1431,6 +1465,7 @@ void trap_multi(TrapContext *ctx, struct trapmd *data, int items)
 
 void trap_memcpyha_safe(TrapContext *ctx, uaecptr dst, const uae_u8 *src, int size)
 {
+	write_log(_T("trap_memcpyha_safe\n"));
 	if (size <= 0)
 		return;
 	if (trap_is_indirect()) {
@@ -1441,6 +1476,7 @@ void trap_memcpyha_safe(TrapContext *ctx, uaecptr dst, const uae_u8 *src, int si
 }
 void trap_memcpyah_safe(TrapContext *ctx, uae_u8 *dst, uaecptr src, int size)
 {
+	write_log(_T("trap_memcpyah_safe\n"));
 	if (size <= 0)
 		return;
 	if (trap_is_indirect()) {
