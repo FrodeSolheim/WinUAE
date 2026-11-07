@@ -5293,7 +5293,7 @@ static void InitializeListView (HWND hDlg)
 			lvstruct.iItem    = i;
 			lvstruct.iSubItem = 0;
 			result = ListView_InsertItem (list, &lvstruct);
-			ListView_SetItemText (list, result, 1, exts[i].enabled ? _T("*") : _T(""));
+			ListView_SetItemText (list, result, 1, (LPTSTR)(exts[i].enabled ? _T("*") : _T("")));
 		}
 
 	} else if (lv_type == LV_INPUT) {
@@ -5434,7 +5434,7 @@ static void InitializeListView (HWND hDlg)
 				blkdev_get_info (&workprefs, i, &di);
 			_stprintf (tmp, _T("%d"), i);
 			lvstruct.mask     = LVIF_TEXT | LVIF_PARAM;
-			lvstruct.pszText  = cds->inuse ? (di.media_inserted ? _T("*") : _T("E")) : _T("-");
+			lvstruct.pszText  = (LPTSTR)(cds->inuse ? (di.media_inserted ? _T("*") : _T("E")) : _T("-"));
 			lvstruct.lParam   = 0;
 			lvstruct.iItem    = i;
 			lvstruct.iSubItem = 0;
@@ -5576,7 +5576,7 @@ static void InitializeListView (HWND hDlg)
 			WIN32GUI_LoadUIString (ci->readonly ? IDS_NO : IDS_YES, readwrite_str, sizeof (readwrite_str) / sizeof (TCHAR));
 
 			lvstruct.mask     = LVIF_TEXT | LVIF_PARAM;
-			lvstruct.pszText  = mi.ismedia == false ? _T("E") : (nosize && mi.size >= 0 ? _T("X") : (mi.ismounted ? _T("*") : _T(" ")));
+			lvstruct.pszText  = (LPTSTR)(mi.ismedia == false ? _T("E") : (nosize && mi.size >= 0 ? _T("X") : (mi.ismounted ? _T("*") : _T(" "))));
 			if (mi.error == -1)
 				lvstruct.pszText = _T("?");
 			else if (mi.error == -2)
@@ -6826,7 +6826,7 @@ static void rewritepaths(void)
 {
 	for(int i = 0; pathnames[i]; i++) {
 		TCHAR tmp[MAX_DPATH];
-		fetch_path(pathnames[i], tmp, sizeof(tmp) / sizeof TCHAR);
+		fetch_path(pathnames[i], tmp, sizeof(tmp) / sizeof(TCHAR));
 		set_path(pathnames[i], tmp);
 	}
 }
@@ -6906,7 +6906,7 @@ static void zipdate(zip_fileinfo *zi)
 	FILETIME ft;
 	WORD dosdate, dostime;
 
-	memset(zi, 0, sizeof zip_fileinfo);
+	memset(zi, 0, sizeof(zip_fileinfo));
 
 	GetLocalTime (&st);
 	SystemTimeToFileTime (&st, &ft);
@@ -6927,7 +6927,7 @@ static void ziplog(const char *name, const TCHAR *path, zipFile zf)
 				TCHAR buf[MAX_DPATH];
 				if (!fgetws (buf, sizeof buf / sizeof (TCHAR), s))
 					break;
-				zipWriteInFileInZip(zf, buf, uaetcslen(buf) * sizeof TCHAR);
+				zipWriteInFileInZip(zf, buf, uaetcslen(buf) * sizeof(TCHAR));
 			}
 			zipCloseFileInZip(zf);
 		}

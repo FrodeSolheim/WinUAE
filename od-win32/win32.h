@@ -194,7 +194,7 @@ struct assext {
 	struct contextcommand *cc;
     int enabled;
 };
-struct assext exts[];
+extern struct assext exts[];
 void associate_file_extensions (void);
 
 #define PATHPREFIX _T("\\\\?\\")

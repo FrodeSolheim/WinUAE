@@ -357,7 +357,9 @@ typedef long uae_atomic;
 
 #define HAVE_ISNAN
 #undef HAVE_ISINF
+#ifndef __clang__ /* would rename clang-cl STL builtins (__builtin_isnan) */
 #define isnan _isnan
+#endif
 
 #ifndef LT_MODULE_EXT
 #ifdef _WIN32

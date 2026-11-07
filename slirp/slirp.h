@@ -208,7 +208,7 @@ int inet_aton(const char *cp, struct in_addr *ia);
 #include <ppp/slirppp.h>
 #endif
 
-#ifdef __STDC__
+#if defined(__STDC__) || defined(_MSC_VER)
 #include <stdarg.h>
 #else
 #include <varargs.h>

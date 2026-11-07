@@ -347,7 +347,7 @@ static int AVIOutput_AllocateAudio (bool immediate)
 		if (wfxMaxFmtSize < sizeof (WAVEFORMATEX))
 			return 0;
 		pwfxDst = (LPWAVEFORMATEX)xmalloc (uae_u8, wfxMaxFmtSize);
-		memcpy(pwfxDst, &wfxSrc.Format, sizeof WAVEFORMATEX);
+		memcpy(pwfxDst, &wfxSrc.Format, sizeof(WAVEFORMATEX));
 		pwfxDst->cbSize = (WORD) (wfxMaxFmtSize - sizeof (WAVEFORMATEX)); // shrugs
 	}
 

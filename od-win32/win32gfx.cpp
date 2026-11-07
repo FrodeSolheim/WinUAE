@@ -870,7 +870,7 @@ static BOOL CALLBACK monitorEnumProc2(HMONITOR h, HDC hdc, LPRECT rect, LPARAM d
 	GetMonitorInfo(h, (LPMONITORINFO)&lpmi);
 	for (int i = 0; i < MAX_DISPLAYS && Displays[i].monitorid; i++) {
 		struct MultiDisplay *md = &Displays[i];
-		if (!_tcscmp (md->adapterid, lpmi.szDevice) && !memcmp(&md->rect, &lpmi.rcMonitor, sizeof RECT)) {
+		if (!_tcscmp (md->adapterid, lpmi.szDevice) && !memcmp(&md->rect, &lpmi.rcMonitor, sizeof(RECT))) {
 			md->workrect = lpmi.rcWork;
 			md->monitor = h;
 			adjustappbar(&md->rect, &md->workrect);
@@ -884,7 +884,7 @@ void reenumeratemonitors(void)
 {
 	for (int i = 0; i < MAX_DISPLAYS; i++) {
 		struct MultiDisplay *md = &Displays[i];
-		memcpy(&md->workrect, &md->rect, sizeof RECT);
+		memcpy(&md->workrect, &md->rect, sizeof(RECT));
 	}
 	EnumDisplayMonitors (NULL, NULL, monitorEnumProc2, NULL);
 }

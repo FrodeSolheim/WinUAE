@@ -544,7 +544,7 @@ static void openprinter(void)
 			// Fill in the structure with info about this "document."
 			DocInfo.pDocName = _T("WinUAE Document");
 			DocInfo.pOutputFile = NULL;
-			DocInfo.pDatatype = (currprefs.parallel_matrix_emulation || currprefs.parallel_postscript_detection) ? _T("TEXT") : (version >= 4 ? _T("XPS_PASS") : _T("RAW"));
+			DocInfo.pDatatype = (LPTSTR)((currprefs.parallel_matrix_emulation || currprefs.parallel_postscript_detection) ? _T("TEXT") : (version >= 4 ? _T("XPS_PASS") : _T("RAW")));
 			// Inform the spooler the document is beginning.
 			if ((dwJob = StartDocPrinter (hPrt, 1, (LPBYTE)&DocInfo)) == 0) {
 				error = GetLastError();
@@ -947,7 +947,7 @@ static BOOL tcpserial;
 
 static bool tcp_is_connected (void)
 {
-	socklen_t sa_len = sizeof SOCKADDR_INET;
+	socklen_t sa_len = sizeof(SOCKADDR_INET);
 	if (serialsocket == INVALID_SOCKET)
 		return false;
 	if (serialconn == INVALID_SOCKET) {

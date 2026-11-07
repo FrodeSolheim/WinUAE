@@ -261,7 +261,7 @@ struct netdriverdata *uaenet_enumerate (const TCHAR *name)
 			break;
 		}
 		ss = au (d->name);
-		ss2 = d->description ? au (d->description) : _T("(no description)");
+		ss2 = d->description ? au (d->description) : my_strdup (_T("(no description)"));
 		write_log (_T("%s\n- %s\n"), ss, ss2);
 		xfree (ss2);
 		xfree (ss);

@@ -2154,11 +2154,16 @@ void update_debug_info(void)
 	}
 
 	hwnd = GetDlgItem(hDbgWnd, IDC_DBG_CCR);
-	UpdateListboxString(hwnd, 0, GET_XFLG() ? _T("X: 1") : _T("X: 0"), TRUE);
-	UpdateListboxString(hwnd, 1, GET_NFLG() ? _T("N: 1") : _T("N: 0"), TRUE);
-	UpdateListboxString(hwnd, 2, GET_ZFLG() ? _T("Z: 1") : _T("Z: 0"), TRUE);
-	UpdateListboxString(hwnd, 3, GET_VFLG() ? _T("V: 1") : _T("V: 0"), TRUE);
-	UpdateListboxString(hwnd, 4, GET_CFLG() ? _T("C: 1") : _T("C: 0"), TRUE);
+	_tcscpy(out, GET_XFLG() ? _T("X: 1") : _T("X: 0"));
+	UpdateListboxString(hwnd, 0, out, TRUE);
+	_tcscpy(out, GET_NFLG() ? _T("N: 1") : _T("N: 0"));
+	UpdateListboxString(hwnd, 1, out, TRUE);
+	_tcscpy(out, GET_ZFLG() ? _T("Z: 1") : _T("Z: 0"));
+	UpdateListboxString(hwnd, 2, out, TRUE);
+	_tcscpy(out, GET_VFLG() ? _T("V: 1") : _T("V: 0"));
+	UpdateListboxString(hwnd, 3, out, TRUE);
+	_tcscpy(out, GET_CFLG() ? _T("C: 1") : _T("C: 0"));
+	UpdateListboxString(hwnd, 4, out, TRUE);
 
 	hwnd = GetDlgItem(hDbgWnd, IDC_DBG_SP_VBR);
 	_stprintf(out, _T("USP: %08X"), regs.usp);

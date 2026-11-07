@@ -1784,7 +1784,7 @@ static bool initialize_rawinput (void)
 				_tcscpy (tmp, prodname);
 				did->fullname = true;
 			} else {
-				TCHAR *st = type == RIM_TYPEHID ? (did->xinput ? _T("RAW HID+XINPUT") : _T("RAW HID")) : (type == RIM_TYPEMOUSE ? _T("RAW Mouse") : _T("RAW Keyboard"));
+				const TCHAR *st = type == RIM_TYPEHID ? (did->xinput ? _T("RAW HID+XINPUT") : _T("RAW HID")) : (type == RIM_TYPEMOUSE ? _T("RAW Mouse") : _T("RAW Keyboard"));
 				if (did->vid > 0 && did->pid > 0)
 					_stprintf (tmp, _T("%s (%04X/%04X)"), st, did->vid, did->pid);
 				else
@@ -2055,7 +2055,8 @@ error2:
 static void initialize_windowsmouse (void)
 {
 	struct didata *did = di_mouse;
-	TCHAR tmp[100], *name;
+	TCHAR tmp[100];
+	const TCHAR *name;
 	int i, j;
 
 	did += num_mouse;

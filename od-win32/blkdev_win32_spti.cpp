@@ -506,7 +506,7 @@ static void checkcapabilities (struct dev_info_spti *di)
 	STORAGE_PROPERTY_QUERY query;
 	DWORD ret, status;
 
-	memset (&query, 0, sizeof STORAGE_PROPERTY_QUERY);
+	memset (&query, 0, sizeof(STORAGE_PROPERTY_QUERY));
 	query.PropertyId = StorageAdapterProperty;
 	query.QueryType = PropertyStandardQuery;
 	status = DeviceIoControl (di->handle, IOCTL_STORAGE_QUERY_PROPERTY,

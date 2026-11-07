@@ -53,7 +53,7 @@ static int max_vert_dbl = VRES_DOUBLE;
 
 static int default_width, default_height;
 static int hwndset;
-static int minimized;
+static int rp_minimized;
 static DWORD hd_mask, cd_mask, floppy_mask;
 static int mousecapture, mousemagic;
 static int rp_filter, rp_filter_default;
@@ -941,7 +941,7 @@ static void set_screenmode (struct RPScreenMode *sm, struct uae_prefs *p)
 
 	gfx_height_original = gm->gfx_size_win.height;
 	storeflags = sm->dwScreenMode;
-	minimized = 0;
+	rp_minimized = 0;
 	if (display) {
 		p->gfx_apmode[APMODE_NATIVE].gfx_display = display;
 		p->gfx_apmode[APMODE_RTG].gfx_display = display;

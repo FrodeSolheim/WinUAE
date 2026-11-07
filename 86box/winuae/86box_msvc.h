@@ -83,6 +83,18 @@ static __forceinline int __builtin_clz(unsigned int x)
 	return 31 - (int)i;
 }
 
+#elif defined(_MSC_VER) && defined(__clang__)
+
+/* clang-cl understands the GNU builtins and attributes, but the UCRT
+   math.h still only provides M_PI and friends on request */
+#define _USE_MATH_DEFINES
+
+/* clang-cl would lower __int128 division to compiler-rt helpers that the
+   MSVC runtime doesn't provide; use the same STL classes as MSVC instead */
+#include <__msvc_int128.hpp>
+#define int128_t std::_Signed128
+#define uint128_t std::_Unsigned128
+
 #endif
 
 #endif /* WINUAE_86BOX_MSVC_H */

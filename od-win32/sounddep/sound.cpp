@@ -961,7 +961,7 @@ error:
 
 static void setwavfmt (WAVEFORMATEXTENSIBLE *wavfmt, struct sound_data *sd, DWORD channelmask)
 {
-	memset (wavfmt, 0, sizeof WAVEFORMATEXTENSIBLE);
+	memset (wavfmt, 0, sizeof(WAVEFORMATEXTENSIBLE));
 	wavfmt->Format.nChannels = sd->channels;
 	wavfmt->Format.nSamplesPerSec = sd->freq;
 	wavfmt->Format.wBitsPerSample = 16;

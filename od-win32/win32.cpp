@@ -8117,8 +8117,8 @@ HMODULE WIN32_LoadLibrary_2 (const TCHAR *name, int expand)
 #endif
 		get_plugin_path (s, sizeof s / sizeof (TCHAR), NULL);
 		_tcscat (s, newname);
-		GetDllDirectory(sizeof(dir2) / sizeof TCHAR, dir2);
-		getpathpart(dir, sizeof(dir) / sizeof TCHAR, s);
+		GetDllDirectory(sizeof(dir2) / sizeof(TCHAR), dir2);
+		getpathpart(dir, sizeof(dir) / sizeof(TCHAR), s);
 		stripslashes(dir);
 		if (dir[0])
 			SetDllDirectory(dir);
